@@ -2,21 +2,26 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>WSS CCTV Player</title>
+<title>CCTV Player</title>
 
 <style>
+
 html,body{
 margin:0;
-background:black;
+padding:0;
+background:#000;
+width:100%;
 height:100%;
+overflow:hidden;
 display:flex;
 align-items:center;
 justify-content:center;
 }
 
-video{
+#video{
 width:100%;
 height:100%;
+object-fit:contain;
 background:black;
 }
 
@@ -26,37 +31,49 @@ color:white;
 font-family:Arial;
 font-size:20px;
 }
-</style>
 
+</style>
 </head>
 
 <body>
 
-<div id="loading">Loading stream...</div>
+<div id="loading">Loading CCTV Stream...</div>
 
-<video id="video" autoplay muted controls playsinline></video>
+<video id="video" autoplay muted playsinline></video>
 
 <script>
 
 const video = document.getElementById("video")
 const loading = document.getElementById("loading")
 
+let mediaSource
 let sourceBuffer
+let websocket
+
 let queue=[]
 let streamingStarted=false
-let ws
+let reconnectDelay=5000
 
 function startStream(url){
 
-const mediaSource = new MediaSource()
+mediaSource = new MediaSource()
+
 video.src = URL.createObjectURL(mediaSource)
 
-mediaSource.addEventListener("sourceopen",()=>{
+mediaSource.addEventListener("sourceopen", ()=>{
 
-ws = new WebSocket(url)
-ws.binaryType="arraybuffer"
+connectWS(url)
 
-ws.onmessage = (event)=>{
+})
+
+}
+
+function connectWS(url){
+
+websocket = new WebSocket(url)
+websocket.binaryType="arraybuffer"
+
+websocket.onmessage = (event)=>{
 
 const data = new Uint8Array(event.data)
 
@@ -67,7 +84,7 @@ const codec = new TextDecoder().decode(data.slice(1))
 sourceBuffer = mediaSource.addSourceBuffer(`video/mp4; codecs="${codec}"`)
 sourceBuffer.mode="segments"
 
-sourceBuffer.addEventListener("updateend",appendQueue)
+sourceBuffer.addEventListener("updateend", appendQueue)
 
 }else{
 
@@ -77,10 +94,8 @@ appendSegment(event.data)
 
 }
 
-ws.onerror= reconnect
-ws.onclose= reconnect
-
-})
+websocket.onerror = reconnect
+websocket.onclose = reconnect
 
 }
 
@@ -102,7 +117,9 @@ appendQueue()
 
 function appendQueue(){
 
-if(!sourceBuffer.updating && queue.length>0){
+if(!sourceBuffer || sourceBuffer.updating) return
+
+if(queue.length>0){
 
 sourceBuffer.appendBuffer(queue.shift())
 
@@ -118,35 +135,37 @@ setTimeout(()=>{
 
 location.reload()
 
-},5000)
-
-}
-
-const hash = location.hash.replace("#","")
-
-if(hash){
-
-startStream(hash)
-
-}else{
-
-loading.innerText="No stream URL in hash"
+}, reconnectDelay)
 
 }
 
 video.addEventListener("playing",()=>{
+
 loading.style.display="none"
+
 })
 
-video.addEventListener("dblclick",()=>{
+document.body.addEventListener("click",()=>{
 
-if(document.fullscreenElement){
-document.exitFullscreen()
-}else{
-video.requestFullscreen()
+if(!document.fullscreenElement){
+
+document.documentElement.requestFullscreen()
+
 }
 
 })
+
+const streamURL = location.hash.replace("#","")
+
+if(streamURL){
+
+startStream(streamURL)
+
+}else{
+
+loading.innerText="No stream URL"
+
+}
 
 </script>
 
