@@ -2,68 +2,69 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>CCTV Player</title>
+<title>CCTV Stream Player</title>
 
 <style>
-
 html,body{
 margin:0;
 padding:0;
-background:#000;
 width:100%;
 height:100%;
+background:#000;
 overflow:hidden;
+}
+
+#videoContainer{
+width:100%;
+height:100%;
 display:flex;
 align-items:center;
 justify-content:center;
 }
 
-#video{
+video{
 width:100%;
 height:100%;
 object-fit:contain;
-background:black;
+background:#000;
 }
 
 #loading{
 position:absolute;
 color:white;
-font-family:Arial;
-font-size:20px;
+font-family:Arial, sans-serif;
+font-size:18px;
 }
-
 </style>
+
 </head>
 
 <body>
 
-<div id="loading">Loading CCTV Stream...</div>
-
-<video id="video" autoplay muted playsinline></video>
+<div id="videoContainer">
+<div id="loading">Connecting CCTV...</div>
+<video id="videoPlayer" autoplay muted playsinline></video>
+</div>
 
 <script>
 
-const video = document.getElementById("video")
+const video = document.getElementById("videoPlayer")
 const loading = document.getElementById("loading")
 
-let mediaSource
+let queue = []
 let sourceBuffer
 let websocket
-
-let queue=[]
-let streamingStarted=false
-let reconnectDelay=5000
+let started = false
+let mediaSource
+let reconnectDelay = 5000
 
 function startStream(url){
 
 mediaSource = new MediaSource()
-
 video.src = URL.createObjectURL(mediaSource)
 
-mediaSource.addEventListener("sourceopen", ()=>{
-
+mediaSource.addEventListener("sourceopen", () => {
 connectWS(url)
-
 })
 
 }
@@ -71,20 +72,20 @@ connectWS(url)
 function connectWS(url){
 
 websocket = new WebSocket(url)
-websocket.binaryType="arraybuffer"
+websocket.binaryType = "arraybuffer"
 
-websocket.onmessage = (event)=>{
+websocket.onmessage = (event) => {
 
 const data = new Uint8Array(event.data)
 
-if(data[0]===9){
+if(data[0] === 9){
 
-const codec = new TextDecoder().decode(data.slice(1))
+const codec = new TextDecoder("utf-8").decode(data.slice(1))
 
 sourceBuffer = mediaSource.addSourceBuffer(`video/mp4; codecs="${codec}"`)
-sourceBuffer.mode="segments"
+sourceBuffer.mode = "segments"
 
-sourceBuffer.addEventListener("updateend", appendQueue)
+sourceBuffer.addEventListener("updateend", processQueue)
 
 }else{
 
@@ -101,56 +102,54 @@ websocket.onclose = reconnect
 
 function appendSegment(segment){
 
-if(!streamingStarted){
+if(!started){
 
 sourceBuffer.appendBuffer(segment)
-streamingStarted=true
+started = true
 
 }else{
 
 queue.push(segment)
-appendQueue()
 
+if(!sourceBuffer.updating){
+processQueue()
 }
 
 }
 
-function appendQueue(){
-
-if(!sourceBuffer || sourceBuffer.updating) return
-
-if(queue.length>0){
-
-sourceBuffer.appendBuffer(queue.shift())
-
 }
+
+function processQueue(){
+
+if(queue.length === 0) return
+if(sourceBuffer.updating) return
+
+const segment = queue.shift()
+sourceBuffer.appendBuffer(segment)
 
 }
 
 function reconnect(){
 
-loading.innerText="Reconnecting..."
+loading.innerText = "Reconnecting..."
 
-setTimeout(()=>{
+queue = []
+started = false
 
+setTimeout(() => {
 location.reload()
-
 }, reconnectDelay)
 
 }
 
-video.addEventListener("playing",()=>{
-
-loading.style.display="none"
-
+video.addEventListener("playing", () => {
+loading.style.display = "none"
 })
 
-document.body.addEventListener("click",()=>{
+document.body.addEventListener("click", () => {
 
 if(!document.fullscreenElement){
-
 document.documentElement.requestFullscreen()
-
 }
 
 })
@@ -158,13 +157,9 @@ document.documentElement.requestFullscreen()
 const streamURL = location.hash.replace("#","")
 
 if(streamURL){
-
 startStream(streamURL)
-
 }else{
-
-loading.innerText="No stream URL"
-
+loading.innerText = "No stream URL"
 }
 
 </script>
