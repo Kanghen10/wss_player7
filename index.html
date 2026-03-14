@@ -5,6 +5,7 @@
 <title>CCTV Stream Player</title>
 
 <style>
+
 html,body{
 margin:0;
 padding:0;
@@ -20,6 +21,7 @@ height:100%;
 display:flex;
 align-items:center;
 justify-content:center;
+position:relative;
 }
 
 video{
@@ -32,39 +34,46 @@ background:#000;
 #loading{
 position:absolute;
 color:white;
-font-family:Arial, sans-serif;
-font-size:18px;
+font-family:Arial;
+font-size:20px;
 }
-</style>
 
+</style>
 </head>
 
 <body>
 
 <div id="videoContainer">
-<div id="loading">Connecting CCTV...</div>
+
+<div id="loading">Loading CCTV...</div>
+
 <video id="videoPlayer" autoplay muted playsinline></video>
+
 </div>
 
 <script>
 
+const container = document.getElementById("videoContainer")
 const video = document.getElementById("videoPlayer")
 const loading = document.getElementById("loading")
 
-let queue = []
+let queue=[]
 let sourceBuffer
 let websocket
-let started = false
+let started=false
 let mediaSource
-let reconnectDelay = 5000
+let reconnectDelay=5000
 
 function startStream(url){
 
 mediaSource = new MediaSource()
+
 video.src = URL.createObjectURL(mediaSource)
 
-mediaSource.addEventListener("sourceopen", () => {
+mediaSource.addEventListener("sourceopen",function(){
+
 connectWS(url)
+
 })
 
 }
@@ -72,20 +81,22 @@ connectWS(url)
 function connectWS(url){
 
 websocket = new WebSocket(url)
-websocket.binaryType = "arraybuffer"
 
-websocket.onmessage = (event) => {
+websocket.binaryType="arraybuffer"
 
-const data = new Uint8Array(event.data)
+websocket.onmessage=function(event){
 
-if(data[0] === 9){
+const bytes = new Uint8Array(event.data)
 
-const codec = new TextDecoder("utf-8").decode(data.slice(1))
+if(bytes[0]===9){
 
-sourceBuffer = mediaSource.addSourceBuffer(`video/mp4; codecs="${codec}"`)
-sourceBuffer.mode = "segments"
+const codec = new TextDecoder("utf-8").decode(bytes.slice(1))
 
-sourceBuffer.addEventListener("updateend", processQueue)
+sourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="'+codec+'"')
+
+sourceBuffer.mode="segments"
+
+sourceBuffer.addEventListener("updateend",processQueue)
 
 }else{
 
@@ -95,8 +106,17 @@ appendSegment(event.data)
 
 }
 
-websocket.onerror = reconnect
-websocket.onclose = reconnect
+websocket.onerror=function(){
+
+reconnect()
+
+}
+
+websocket.onclose=function(){
+
+reconnect()
+
+}
 
 }
 
@@ -105,14 +125,17 @@ function appendSegment(segment){
 if(!started){
 
 sourceBuffer.appendBuffer(segment)
-started = true
+
+started=true
 
 }else{
 
 queue.push(segment)
 
 if(!sourceBuffer.updating){
+
 processQueue()
+
 }
 
 }
@@ -121,35 +144,43 @@ processQueue()
 
 function processQueue(){
 
-if(queue.length === 0) return
+if(queue.length===0) return
+
 if(sourceBuffer.updating) return
 
 const segment = queue.shift()
+
 sourceBuffer.appendBuffer(segment)
 
 }
 
 function reconnect(){
 
-loading.innerText = "Reconnecting..."
+loading.innerText="Reconnecting..."
 
-queue = []
-started = false
+queue=[]
+started=false
 
-setTimeout(() => {
+setTimeout(function(){
+
 location.reload()
-}, reconnectDelay)
+
+},reconnectDelay)
 
 }
 
-video.addEventListener("playing", () => {
-loading.style.display = "none"
+video.addEventListener("playing",function(){
+
+loading.style.display="none"
+
 })
 
-document.body.addEventListener("click", () => {
+container.addEventListener("click",function(){
 
 if(!document.fullscreenElement){
-document.documentElement.requestFullscreen()
+
+container.requestFullscreen()
+
 }
 
 })
@@ -157,9 +188,13 @@ document.documentElement.requestFullscreen()
 const streamURL = location.hash.replace("#","")
 
 if(streamURL){
+
 startStream(streamURL)
+
 }else{
-loading.innerText = "No stream URL"
+
+loading.innerText="No stream URL"
+
 }
 
 </script>
