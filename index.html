@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WSS CCTV Player</title>
+
+<style>
+html,body{
+margin:0;
+background:black;
+height:100%;
+display:flex;
+align-items:center;
+justify-content:center;
+}
+
+video{
+width:100%;
+height:100%;
+background:black;
+}
+
+#loading{
+position:absolute;
+color:white;
+font-family:Arial;
+font-size:20px;
+}
+</style>
+
+</head>
+
+<body>
+
+<div id="loading">Loading stream...</div>
+
+<video id="video" autoplay muted controls playsinline></video>
+
+<script>
+
+const video = document.getElementById("video")
+const loading = document.getElementById("loading")
+
+let sourceBuffer
+let queue=[]
+let streamingStarted=false
+let ws
+
+function startStream(url){
+
+const mediaSource = new MediaSource()
+video.src = URL.createObjectURL(mediaSource)
+
+mediaSource.addEventListener("sourceopen",()=>{
+
+ws = new WebSocket(url)
+ws.binaryType="arraybuffer"
+
+ws.onmessage = (event)=>{
+
+const data = new Uint8Array(event.data)
+
+if(data[0]===9){
+
+const codec = new TextDecoder().decode(data.slice(1))
+
+sourceBuffer = mediaSource.addSourceBuffer(`video/mp4; codecs="${codec}"`)
+sourceBuffer.mode="segments"
+
+sourceBuffer.addEventListener("updateend",appendQueue)
+
+}else{
+
+appendSegment(event.data)
+
+}
+
+}
+
+ws.onerror= reconnect
+ws.onclose= reconnect
+
+})
+
+}
+
+function appendSegment(segment){
+
+if(!streamingStarted){
+
+sourceBuffer.appendBuffer(segment)
+streamingStarted=true
+
+}else{
+
+queue.push(segment)
+appendQueue()
+
+}
+
+}
+
+function appendQueue(){
+
+if(!sourceBuffer.updating && queue.length>0){
+
+sourceBuffer.appendBuffer(queue.shift())
+
+}
+
+}
+
+function reconnect(){
+
+loading.innerText="Reconnecting..."
+
+setTimeout(()=>{
+
+location.reload()
+
+},5000)
+
+}
+
+const hash = location.hash.replace("#","")
+
+if(hash){
+
+startStream(hash)
+
+}else{
+
+loading.innerText="No stream URL in hash"
+
+}
+
+video.addEventListener("playing",()=>{
+loading.style.display="none"
+})
+
+video.addEventListener("dblclick",()=>{
+
+if(document.fullscreenElement){
+document.exitFullscreen()
+}else{
+video.requestFullscreen()
+}
+
+})
+
+</script>
+
+</body>
+</html>
