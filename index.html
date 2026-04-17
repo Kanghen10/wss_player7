@@ -3,67 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>HLS Player - CCTV Banyuwangi</title>
+    <title>WSS Player - CCTV Banyuwangi (WebSocket)</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-
         body {
             background: #0a0f1c;
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: 'Segoe UI', system-ui, sans-serif;
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
         }
-
         .player-container {
             max-width: 1200px;
             width: 100%;
             background: linear-gradient(145deg, #141a2c 0%, #0e1322 100%);
             border-radius: 32px;
-            box-shadow: 0 25px 45px -12px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 25px 45px -12px rgba(0,0,0,0.5);
             overflow: hidden;
-            border: 1px solid rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59,130,246,0.2);
         }
-
         .video-wrapper {
             position: relative;
             background: #000;
             aspect-ratio: 16 / 9;
             width: 100%;
         }
-
         video {
             width: 100%;
             height: 100%;
             object-fit: contain;
             display: block;
         }
-
         .info-panel {
             padding: 20px 24px;
-            background: rgba(15, 25, 50, 0.9);
+            background: rgba(15,25,50,0.9);
             backdrop-filter: blur(10px);
-            border-top: 1px solid rgba(59, 130, 246, 0.3);
+            border-top: 1px solid rgba(59,130,246,0.3);
         }
-
         .stream-url {
             background: #0a0e1a;
             padding: 12px 16px;
             border-radius: 14px;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: monospace;
             font-size: 13px;
             word-break: break-all;
             color: #60a5fa;
             border: 1px solid #1e2a4a;
             margin-bottom: 16px;
         }
-
         .status {
             display: flex;
             align-items: center;
@@ -71,7 +64,6 @@
             margin-bottom: 16px;
             flex-wrap: wrap;
         }
-
         .status-badge {
             display: inline-flex;
             align-items: center;
@@ -82,7 +74,6 @@
             font-size: 13px;
             color: #94a3b8;
         }
-
         .status-dot {
             width: 8px;
             height: 8px;
@@ -91,25 +82,15 @@
             box-shadow: 0 0 6px #22c55e;
             animation: pulse 1.5s infinite;
         }
-
         .status-dot.disconnected {
             background: #ef4444;
             box-shadow: none;
             animation: none;
         }
-
         @keyframes pulse {
             0% { opacity: 0.4; transform: scale(0.8); }
             100% { opacity: 1; transform: scale(1.2); }
         }
-
-        .controls {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-top: 8px;
-        }
-
         button {
             background: #1e293b;
             border: none;
@@ -118,29 +99,25 @@
             color: white;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: 0.2s;
             font-size: 14px;
             display: inline-flex;
             align-items: center;
             gap: 8px;
         }
-
         button:hover {
             background: #334155;
             transform: translateY(-1px);
         }
-
         button.primary {
             background: #3b82f6;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 2px 8px rgba(59,130,246,0.3);
         }
-
         button.primary:hover {
             background: #2563eb;
         }
-
         .error-message {
-            background: rgba(239, 68, 68, 0.15);
+            background: rgba(239,68,68,0.15);
             border-left: 3px solid #ef4444;
             padding: 12px 16px;
             border-radius: 12px;
@@ -148,18 +125,12 @@
             font-size: 13px;
             margin-top: 12px;
         }
-
         .camera-name {
             font-size: 18px;
             font-weight: 600;
             color: white;
             margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
         }
-
         .camera-name small {
             font-size: 12px;
             font-weight: normal;
@@ -168,123 +139,82 @@
             padding: 2px 10px;
             border-radius: 20px;
         }
-
         hr {
             border-color: #1e2a4a;
             margin: 12px 0;
         }
-
         @media (max-width: 640px) {
             body { padding: 12px; }
             .info-panel { padding: 16px; }
-            button { padding: 6px 14px; font-size: 12px; }
-        }
-
-        .loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            background: rgba(0,0,0,0.6);
-            padding: 8px 16px;
-            border-radius: 30px;
-            font-size: 14px;
-            z-index: 10;
         }
     </style>
-    <!-- HLS.js library -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+    <!-- Library mpegts.js untuk decode MPEG-TS over WebSocket -->
+    <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.min.js"></script>
 </head>
 <body>
-
-<div class="player-container" id="app">
+<div class="player-container">
     <div class="video-wrapper">
-        <video id="videoPlayer" controls playsinline></video>
-        <div id="loadingOverlay" class="loading" style="display: none;">⏳ Memuat stream...</div>
+        <video id="videoPlayer" controls autoplay playsinline muted></video>
     </div>
-    
     <div class="info-panel">
         <div class="camera-name">
             📹 CCTV Banyuwangi
             <small id="cameraIdLabel">-</small>
         </div>
-        
         <div class="stream-url" id="streamUrlDisplay">
-            🔗 Loading URL...
+            🔗 WebSocket URL
         </div>
-        
         <div class="status">
             <div class="status-badge">
                 <span class="status-dot" id="statusDot"></span>
-                <span id="statusText">Menyiapkan player...</span>
+                <span id="statusText">Menghubungkan WebSocket...</span>
             </div>
-            <div class="status-badge">
-                📡 HLS (HTTP Live Streaming)
-            </div>
+            <div class="status-badge">📡 MPEG-TS over WebSocket</div>
         </div>
-        
         <div class="controls">
-            <button id="reloadBtn" class="primary">
-                🔄 Reload Stream
-            </button>
+            <button id="reloadBtn" class="primary">🔄 Reload Stream</button>
         </div>
-        
         <div id="errorPanel"></div>
-        
         <hr>
         <div style="font-size: 12px; color: #64748b; text-align: center;">
-            Gunakan format URL: <br>
-            <code style="background:#1e293b; padding:2px 6px; border-radius:6px;">https://kanghen10.github.io/wss_player7/#CCTV349</code>
-            <br> atau dengan WebSocket (otomatis dikonversi ke HLS)
+            Format URL: <code>https://kanghen10.github.io/wss_player7/#CCTV349</code>
         </div>
     </div>
 </div>
 
 <script>
-    // ================= KONFIGURASI =================
-    // Ambil hash dari URL (misal: #CCTV349 atau #wss://...src=CCTV349)
+    // ================= AMBIL ID CCTV DARI HASH =================
     let hash = window.location.hash.substring(1);
     let cameraId = null;
-    let hlsUrl = null;
-    
-    // Fungsi ekstrak camera ID dari berbagai format
+    let wsUrl = null;
+
     function extractCameraId(input) {
-        // Format langsung: CCTV349
         let match = input.match(/CCTV(\d+)/i);
-        if (match) return match[1]; // angka saja
-        
-        // Format wss://...?src=CCTV349
+        if (match) return match[1];
         match = input.match(/[?&]src=([^&]+)/i);
         if (match) {
             let src = match[1];
             let numMatch = src.match(/\d+/);
             if (numMatch) return numMatch[0];
         }
-        
-        // Jika hanya angka
         if (/^\d+$/.test(input)) return input;
-        
         return null;
     }
-    
+
     if (hash) {
         cameraId = extractCameraId(hash);
         if (cameraId) {
-            // Bangun URL HLS: https://live.banyuwangikab.go.id/hls/{cameraId}/playlist.m3u8
-            hlsUrl = `https://live.banyuwangikab.go.id/hls/${cameraId}/playlist.m3u8`;
-        } else {
-            console.warn('Hash tidak dikenali, coba parsing ulang:', hash);
+            // Bangun WebSocket URL seperti dari halaman asli
+            wsUrl = `wss://live.banyuwangikab.go.id/bjhsgfsgdfhjdgfyg3543g534g5y47856378fg8wetr783t4gw3yry/api/api/api/api/ws?src=CCTV${cameraId}`;
         }
     }
-    
-    // Jika tidak ada hash atau gagal, gunakan default (CCTV349)
-    if (!hlsUrl) {
+
+    if (!wsUrl) {
         cameraId = '349';
-        hlsUrl = 'https://live.banyuwangikab.go.id/hls/349/playlist.m3u8';
+        wsUrl = `wss://live.banyuwangikab.go.id/bjhsgfsgdfhjdgfyg3543g534g5y47856378fg8wetr783t4gw3yry/api/api/api/api/ws?src=CCTV349`;
         console.warn('Tidak ada hash valid, menggunakan default CCTV349');
     }
-    
+
     // DOM Elements
     const video = document.getElementById('videoPlayer');
     const statusDot = document.getElementById('statusDot');
@@ -293,141 +223,103 @@
     const cameraIdLabel = document.getElementById('cameraIdLabel');
     const errorPanel = document.getElementById('errorPanel');
     const reloadBtn = document.getElementById('reloadBtn');
-    const loadingOverlay = document.getElementById('loadingOverlay');
-    
-    // Update tampilan
+
     cameraIdLabel.textContent = `CCTV${cameraId}`;
-    streamUrlDisplay.innerHTML = `🎬 HLS Stream URL<br><span style="font-size:11px; opacity:0.7;">${hlsUrl}</span>`;
-    
-    let hls = null;
-    
-    function showError(message) {
-        errorPanel.innerHTML = `<div class="error-message">⚠️ ${message}</div>`;
+    streamUrlDisplay.innerHTML = `🔌 WebSocket<br><span style="font-size:11px; opacity:0.7;">${wsUrl}</span>`;
+
+    let player = null;  // mpegts.js player instance
+
+    function showError(msg) {
+        errorPanel.innerHTML = `<div class="error-message">⚠️ ${msg}</div>`;
         statusDot.className = "status-dot disconnected";
-        statusText.textContent = "Error / Gagal memuat";
-        loadingOverlay.style.display = 'none';
+        statusText.textContent = "Error / Terputus";
     }
-    
+
     function clearError() {
         errorPanel.innerHTML = '';
     }
-    
+
     function updateStatus(connected, loading = false) {
         if (loading) {
+            statusText.textContent = "Menghubungkan WebSocket...";
             statusDot.className = "status-dot";
-            statusText.textContent = "Memuat stream...";
-            loadingOverlay.style.display = 'flex';
         } else if (connected) {
+            statusText.textContent = "Streaming aktif (MPEG-TS)";
             statusDot.className = "status-dot";
-            statusText.textContent = "Streaming aktif (HLS)";
-            loadingOverlay.style.display = 'none';
         } else {
-            statusDot.className = "status-dot disconnected";
             statusText.textContent = "Terputus / Mencoba ulang";
-            loadingOverlay.style.display = 'none';
+            statusDot.className = "status-dot disconnected";
         }
     }
-    
+
     function loadStream() {
-        // Hentikan player lama
-        if (hls) {
-            hls.destroy();
-            hls = null;
+        clearError();
+        updateStatus(false, true);
+
+        // Hentikan player lama jika ada
+        if (player) {
+            player.destroy();
+            player = null;
         }
         // Kosongkan video
         video.pause();
         video.src = '';
-        video.removeAttribute('src');
         video.load();
-        
-        clearError();
-        updateStatus(false, true);
-        
-        // Cek dukungan HLS
-        if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Untuk Safari (native HLS)
-            console.log('Menggunakan native HLS (Safari)');
-            video.src = hlsUrl;
-            video.addEventListener('loadedmetadata', () => {
-                updateStatus(true, false);
+
+        // Cek dukungan mpegts.js
+        if (!mpegts || !mpegts.isSupported()) {
+            showError("Browser tidak mendukung MPEG-TS (mpegts.js). Gunakan Chrome/Edge/Firefox.");
+            return;
+        }
+
+        try {
+            // Buat player mpegts.js dengan WebSocket sebagai source
+            player = mpegts.createPlayer({
+                type: 'mpegts',
+                isLive: true,
+                url: wsUrl,
+                protocol: 'ws',      // WebSocket
+                enableWorker: true,
+                lazyLoad: false,
+                reconnectInterval: 3000,
+                reconnectAttempts: 5
             });
-            video.addEventListener('error', (e) => {
-                console.error('Video error:', e);
-                showError('Gagal memutar stream. Cek URL atau koneksi.');
+
+            player.attachMediaElement(video);
+            player.load();
+
+            player.on(mpegts.Events.MEDIA_INFO, () => {
+                console.log("Media info diterima, stream siap");
+                updateStatus(true, false);
+                video.play().catch(e => console.warn("Autoplay gagal:", e));
+            });
+
+            player.on(mpegts.Events.ERROR, (err) => {
+                console.error("mpegts error:", err);
+                let msg = "Error decoder. Mungkin WebSocket tidak mengirim MPEG-TS.";
+                if (err === mpegts.ErrorCodes.MEDIA_ERROR) msg += " Format video tidak dikenali.";
+                showError(msg);
                 updateStatus(false, false);
             });
-            video.play().catch(err => {
-                console.warn('Autoplay mungkin diblokir:', err);
-                // Tidak perlu error, user bisa klik play manual
+
+            player.on(mpegts.Events.RECONNECT, () => {
+                console.log("Mencoba reconnect...");
+                statusText.textContent = "Reconnecting...";
             });
-        } else if (Hls.isSupported()) {
-            // Gunakan HLS.js
-            hls = new Hls({
-                debug: false,
-                enableWorker: true,
-                lowLatencyMode: true,
-                backBufferLength: 30
-            });
-            hls.loadSource(hlsUrl);
-            hls.attachMedia(video);
-            
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                console.log('Manifest HLS parsed');
-                updateStatus(true, false);
-                video.play().catch(err => {
-                    console.warn('Autoplay gagal:', err);
-                });
-            });
-            
-            hls.on(Hls.Events.ERROR, (event, data) => {
-                console.error('HLS error:', data);
-                if (data.fatal) {
-                    switch (data.type) {
-                        case Hls.ErrorTypes.NETWORK_ERROR:
-                            showError('Network error. Coba reload.');
-                            break;
-                        case Hls.ErrorTypes.MEDIA_ERROR:
-                            showError('Media error. Coba reload.');
-                            break;
-                        default:
-                            showError('Fatal error: ' + data.details);
-                            break;
-                    }
-                    updateStatus(false, false);
-                    // Coba reload otomatis sekali
-                    if (!window._reloading) {
-                        window._reloading = true;
-                        setTimeout(() => {
-                            window._reloading = false;
-                            loadStream();
-                        }, 3000);
-                    }
-                }
-            });
-        } else {
-            showError('Browser tidak mendukung HLS. Gunakan Chrome, Edge, atau Safari.');
+
+        } catch (err) {
+            console.error("Gagal membuat player:", err);
+            showError("Gagal inisialisasi player: " + err.message);
             updateStatus(false, false);
         }
     }
-    
-    // Reload manual
+
     function reloadStream() {
         loadStream();
     }
-    
-    reloadBtn.addEventListener('click', reloadStream);
-    
-    // Mulai stream
-    loadStream();
-    
-    // Optional: jika tab tidak aktif, tidak perlu reload otomatis
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && video.paused && video.src) {
-            // Coba play lagi jika tab aktif dan video pause (bukan karena error)
-            video.play().catch(e => console.log('play on visible failed', e));
-        }
-    });
-</script>
 
+    reloadBtn.addEventListener('click', reloadStream);
+    loadStream();
+</script>
 </body>
 </html>
