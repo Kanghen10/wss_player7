@@ -1,202 +1,497 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-<meta charset="utf-8">
-<title>CCTV Stream Player</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>WSS Player - Pemutar CCTV Banyuwangi</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-<style>
+        body {
+            background: #0a0f1c;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
 
-html,body{
-margin:0;
-padding:0;
-width:100%;
-height:100%;
-background:#000;
-overflow:hidden;
-}
+        .player-container {
+            max-width: 1200px;
+            width: 100%;
+            background: linear-gradient(145deg, #141a2c 0%, #0e1322 100%);
+            border-radius: 32px;
+            box-shadow: 0 25px 45px -12px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
 
-#videoContainer{
-width:100%;
-height:100%;
-display:flex;
-align-items:center;
-justify-content:center;
-position:relative;
-}
+        .video-wrapper {
+            position: relative;
+            background: #000;
+            aspect-ratio: 16 / 9;
+            width: 100%;
+        }
 
-video{
-width:100%;
-height:100%;
-object-fit:contain;
-background:#000;
-}
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
 
-#loading{
-position:absolute;
-color:white;
-font-family:Arial;
-font-size:20px;
-}
+        .info-panel {
+            padding: 20px 24px;
+            background: rgba(15, 25, 50, 0.9);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(59, 130, 246, 0.3);
+        }
 
-</style>
+        .stream-url {
+            background: #0a0e1a;
+            padding: 12px 16px;
+            border-radius: 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            word-break: break-all;
+            color: #60a5fa;
+            border: 1px solid #1e2a4a;
+            margin-bottom: 16px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: #1e293b;
+            border-radius: 40px;
+            font-size: 13px;
+            color: #94a3b8;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 6px #22c55e;
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-dot.disconnected {
+            background: #ef4444;
+            box-shadow: none;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.4; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1.2); }
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        button {
+            background: #1e293b;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 40px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background: #334155;
+            transform: translateY(-1px);
+        }
+
+        button.primary {
+            background: #3b82f6;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+
+        button.primary:hover {
+            background: #2563eb;
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.15);
+            border-left: 3px solid #ef4444;
+            padding: 12px 16px;
+            border-radius: 12px;
+            color: #fca5a5;
+            font-size: 13px;
+            margin-top: 12px;
+        }
+
+        .camera-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .camera-name small {
+            font-size: 12px;
+            font-weight: normal;
+            color: #60a5fa;
+            background: #1e2a4a;
+            padding: 2px 10px;
+            border-radius: 20px;
+        }
+
+        hr {
+            border-color: #1e2a4a;
+            margin: 12px 0;
+        }
+
+        @media (max-width: 640px) {
+            body { padding: 12px; }
+            .info-panel { padding: 16px; }
+            button { padding: 6px 14px; font-size: 12px; }
+        }
+    </style>
+    
+    <!-- Library go2rtc untuk WebRTC player -->
+    <script src="https://go2rtc.github.io/player/webrtc-player.js"></script>
 </head>
-
 <body>
 
-<div id="videoContainer">
-
-<div id="loading">Loading CCTV...</div>
-
-<video id="videoPlayer" autoplay muted playsinline></video>
-
+<div class="player-container" id="app">
+    <div class="video-wrapper">
+        <video id="videoPlayer" autoplay playsinline muted></video>
+    </div>
+    
+    <div class="info-panel">
+        <div class="camera-name">
+            📹 CCTV Banyuwangi
+            <small id="cameraIdLabel">-</small>
+        </div>
+        
+        <div class="stream-url" id="streamUrlDisplay">
+            🔗 Loading...
+        </div>
+        
+        <div class="status">
+            <div class="status-badge">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Memeriksa koneksi...</span>
+            </div>
+            <div class="status-badge">
+                📡 WebRTC
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="reloadBtn" class="primary">
+                🔄 Muat Ulang Stream
+            </button>
+            <button id="muteBtn">
+                🔇 Mute
+            </button>
+        </div>
+        
+        <div id="errorPanel"></div>
+        
+        <hr>
+        <div style="font-size: 12px; color: #64748b; text-align: center;">
+            Pemutar menggunakan WebRTC &nbsp;|&nbsp; 
+            <span id="wsHint">wss://...</span>
+        </div>
+    </div>
 </div>
 
 <script>
-
-const container = document.getElementById("videoContainer")
-const video = document.getElementById("videoPlayer")
-const loading = document.getElementById("loading")
-
-let queue=[]
-let sourceBuffer
-let websocket
-let started=false
-let mediaSource
-let reconnectDelay=5000
-
-function startStream(url){
-
-mediaSource = new MediaSource()
-
-video.src = URL.createObjectURL(mediaSource)
-
-mediaSource.addEventListener("sourceopen",function(){
-
-connectWS(url)
-
-})
-
-}
-
-function connectWS(url){
-
-websocket = new WebSocket(url)
-
-websocket.binaryType="arraybuffer"
-
-websocket.onmessage=function(event){
-
-const bytes = new Uint8Array(event.data)
-
-if(bytes[0]===9){
-
-const codec = new TextDecoder("utf-8").decode(bytes.slice(1))
-
-sourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="'+codec+'"')
-
-sourceBuffer.mode="segments"
-
-sourceBuffer.addEventListener("updateend",processQueue)
-
-}else{
-
-appendSegment(event.data)
-
-}
-
-}
-
-websocket.onerror=function(){
-
-reconnect()
-
-}
-
-websocket.onclose=function(){
-
-reconnect()
-
-}
-
-}
-
-function appendSegment(segment){
-
-if(!started){
-
-sourceBuffer.appendBuffer(segment)
-
-started=true
-
-}else{
-
-queue.push(segment)
-
-if(!sourceBuffer.updating){
-
-processQueue()
-
-}
-
-}
-
-}
-
-function processQueue(){
-
-if(queue.length===0) return
-
-if(sourceBuffer.updating) return
-
-const segment = queue.shift()
-
-sourceBuffer.appendBuffer(segment)
-
-}
-
-function reconnect(){
-
-loading.innerText="Reconnecting..."
-
-queue=[]
-started=false
-
-setTimeout(function(){
-
-location.reload()
-
-},reconnectDelay)
-
-}
-
-video.addEventListener("playing",function(){
-
-loading.style.display="none"
-
-})
-
-container.addEventListener("click",function(){
-
-if(!document.fullscreenElement){
-
-container.requestFullscreen()
-
-}
-
-})
-
-const streamURL = location.hash.replace("#","")
-
-if(streamURL){
-
-startStream(streamURL)
-
-}else{
-
-loading.innerText="No stream URL"
-
-}
-
+    // ================= KONFIGURASI =================
+    // Ambil WebSocket URL dari hash URL (format: #wss://...)
+    let wsUrl = window.location.hash.substring(1);
+    
+    // Jika tidak ada hash, gunakan default (ganti dengan URL yang Anda inginkan)
+    if (!wsUrl) {
+        wsUrl = "wss://live.banyuwangikab.go.id/bjhsgfsgdfhjdgfyg3543g534g5y47856378fg8wetr783t4gw3yry/api/api/api/api/ws?src=CCTV349";
+        console.warn("Tidak ada hash URL, menggunakan default:", wsUrl);
+    }
+    
+    // Ekstrak cameraId dari URL untuk ditampilkan
+    let cameraId = "Tidak diketahui";
+    const srcMatch = wsUrl.match(/[?&]src=([^&]+)/);
+    if (srcMatch) cameraId = srcMatch[1];
+    
+    // DOM Elements
+    const videoElement = document.getElementById('videoPlayer');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const streamUrlDisplay = document.getElementById('streamUrlDisplay');
+    const cameraIdLabel = document.getElementById('cameraIdLabel');
+    const errorPanel = document.getElementById('errorPanel');
+    const reloadBtn = document.getElementById('reloadBtn');
+    const muteBtn = document.getElementById('muteBtn');
+    const wsHintSpan = document.getElementById('wsHint');
+    
+    // State
+    let currentPeerConnection = null;
+    let currentDataChannel = null;
+    let isMuted = false;
+    
+    // Update tampilan URL
+    cameraIdLabel.textContent = cameraId;
+    streamUrlDisplay.innerHTML = `🔗 WebSocket URL<br><span style="font-size:11px; opacity:0.7;">${wsUrl}</span>`;
+    wsHintSpan.textContent = wsUrl.length > 60 ? wsUrl.substring(0, 60) + '...' : wsUrl;
+    
+    // Fungsi untuk menampilkan pesan error
+    function showError(message) {
+        errorPanel.innerHTML = `<div class="error-message">⚠️ ${message}</div>`;
+        statusDot.className = "status-dot disconnected";
+        statusText.textContent = "Error / Terputus";
+        console.error("[Error]", message);
+        
+        // Hilangkan setelah 5 detik
+        setTimeout(() => {
+            if (errorPanel.innerHTML) errorPanel.innerHTML = '';
+        }, 5000);
+    }
+    
+    // Fungsi untuk update status koneksi
+    function updateStatus(connected) {
+        if (connected) {
+            statusDot.className = "status-dot";
+            statusText.textContent = "Streaming Aktif (WebRTC)";
+        } else {
+            statusDot.className = "status-dot disconnected";
+            statusText.textContent = "Mencoba menghubungkan...";
+        }
+    }
+    
+    // Fungsi utama untuk memulai koneksi WebRTC via go2rtc
+    async function startWebRTC() {
+        // Bersihkan koneksi lama
+        if (currentPeerConnection) {
+            try { currentPeerConnection.close(); } catch(e) {}
+            currentPeerConnection = null;
+        }
+        if (currentDataChannel) {
+            try { currentDataChannel.close(); } catch(e) {}
+            currentDataChannel = null;
+        }
+        
+        // Hapus sumber video lama
+        if (videoElement.srcObject) {
+            const tracks = videoElement.srcObject.getTracks();
+            tracks.forEach(track => track.stop());
+            videoElement.srcObject = null;
+        }
+        
+        updateStatus(false);
+        errorPanel.innerHTML = '';
+        
+        try {
+            // Konversi ws:// atau wss:// ke format yang digunakan go2rtc player
+            // Player go2rtc membutuhkan URL WebSocket untuk API internalnya
+            // Format: ws:// atau wss:// dengan endpoint /api/ws
+            
+            // Ekstrak base URL dari wsUrl
+            let baseWsUrl = wsUrl;
+            
+            // Jika URL mengandung parameter src, kita gunakan langsung sebagai source
+            // Untuk go2rtc webrtc-player, kita perlu membuat peer connection manual
+            // Alternatif: menggunakan WebRTC native dengan signaling via WebSocket
+            
+            // Karena go2rtc server memiliki endpoint WebRTC signaling,
+            // kita akan menggunakan pendekatan WebRTC native dengan SDP offer/answer
+            
+            console.log("[WebRTC] Memulai koneksi ke:", baseWsUrl);
+            
+            // Buat PeerConnection dengan STUN server
+            const configuration = {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            };
+            
+            const peerConnection = new RTCPeerConnection(configuration);
+            currentPeerConnection = peerConnection;
+            
+            // Handle ICE candidates
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    // Kirim candidate ke server via WebSocket signaling
+                    if (wsSignaling && wsSignaling.readyState === WebSocket.OPEN) {
+                        wsSignaling.send(JSON.stringify({
+                            type: 'candidate',
+                            candidate: event.candidate
+                        }));
+                    }
+                }
+            };
+            
+            // Handle track (video/audio)
+            peerConnection.ontrack = (event) => {
+                console.log("[WebRTC] Track diterima:", event.track.kind);
+                if (event.track.kind === 'video') {
+                    if (videoElement.srcObject) {
+                        // Tambahkan track ke stream yang sudah ada
+                        const stream = videoElement.srcObject;
+                        stream.addTrack(event.track);
+                    } else {
+                        // Buat stream baru
+                        const stream = new MediaStream();
+                        stream.addTrack(event.track);
+                        videoElement.srcObject = stream;
+                    }
+                    updateStatus(true);
+                }
+            };
+            
+            // Tambahkan transceiver untuk video (opsional, untuk receive only)
+            peerConnection.addTransceiver('video', { direction: 'recvonly' });
+            
+            // Buat offer
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            
+            // Signaling via WebSocket ke server go2rtc
+            // Format URL signaling: ganti /ws?src=... menjadi /api/ws?src=...
+            let signalingUrl = wsUrl;
+            if (!signalingUrl.includes('/api/ws')) {
+                signalingUrl = signalingUrl.replace(/\/ws\?/, '/api/ws?');
+            }
+            
+            console.log("[Signaling] Menghubungi:", signalingUrl);
+            
+            const wsSignaling = new WebSocket(signalingUrl);
+            
+            wsSignaling.onopen = () => {
+                console.log("[Signaling] WebSocket terbuka, mengirim SDP offer");
+                wsSignaling.send(JSON.stringify({
+                    type: 'offer',
+                    sdp: offer.sdp
+                }));
+            };
+            
+            wsSignaling.onmessage = async (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log("[Signaling] Pesan diterima:", data.type);
+                    
+                    if (data.type === 'answer') {
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription({
+                            type: 'answer',
+                            sdp: data.sdp
+                        }));
+                    } else if (data.type === 'candidate') {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    } else if (data.type === 'error') {
+                        showError('Server error: ' + (data.message || 'Unknown error'));
+                        wsSignaling.close();
+                    }
+                } catch (e) {
+                    console.warn("[Signaling] Gagal parse JSON:", e);
+                }
+            };
+            
+            wsSignaling.onerror = (err) => {
+                console.error("[Signaling] Error WebSocket:", err);
+                showError('Gagal terhubung ke server signaling. Cek URL WebSocket.');
+            };
+            
+            wsSignaling.onclose = () => {
+                console.log("[Signaling] WebSocket ditutup");
+                if (peerConnection.connectionState !== 'connected') {
+                    showError('Koneksi signaling terputus. Coba reload halaman.');
+                }
+            };
+            
+            // Simpan untuk cleanup
+            currentDataChannel = wsSignaling;
+            
+            // Timeout jika terlalu lama
+            setTimeout(() => {
+                if (peerConnection.connectionState !== 'connected' && peerConnection.connectionState !== 'connecting') {
+                    if (!errorPanel.innerHTML) {
+                        showError('Timeout koneksi. Pastikan URL WebSocket valid dan server aktif.');
+                    }
+                }
+            }, 15000);
+            
+        } catch (err) {
+            console.error("[WebRTC] Error:", err);
+            showError('Gagal memulai WebRTC: ' + err.message);
+        }
+    }
+    
+    // Fungsi untuk reload stream
+    function reloadStream() {
+        startWebRTC().catch(e => {
+            showError('Reload gagal: ' + e.message);
+        });
+    }
+    
+    // Mute/unmute
+    function toggleMute() {
+        if (videoElement.muted) {
+            videoElement.muted = false;
+            muteBtn.innerHTML = '🔇 Mute';
+        } else {
+            videoElement.muted = true;
+            muteBtn.innerHTML = '🔊 Unmute';
+        }
+        isMuted = videoElement.muted;
+    }
+    
+    // Event listeners
+    reloadBtn.addEventListener('click', reloadStream);
+    muteBtn.addEventListener('click', toggleMute);
+    
+    // Cek dukungan WebRTC
+    if (!window.RTCPeerConnection) {
+        showError('Browser Anda tidak mendukung WebRTC. Gunakan Chrome, Firefox, atau Edge terbaru.');
+    } else {
+        // Mulai stream
+        startWebRTC();
+    }
+    
+    // Handle visibility change (pause/resume stream untuk hemat bandwidth)
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            // Tidak melakukan apa-apa, biarkan stream tetap jalan
+            console.log("Tab tidak aktif, stream tetap berjalan");
+        } else {
+            console.log("Tab aktif kembali");
+            if (currentPeerConnection && currentPeerConnection.connectionState !== 'connected') {
+                reloadStream();
+            }
+        }
+    });
 </script>
 
 </body>
